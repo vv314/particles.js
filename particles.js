@@ -27,7 +27,7 @@ var pJS = function(tag_id, params){
         }
       },
       color: {
-        value: '#fff'
+        value: ''  // 默认为空
       },
       shape: {
         type: 'circle',
@@ -139,6 +139,8 @@ var pJS = function(tag_id, params){
   /* params settings */
   if(params){
     Object.deepExtend(pJS, params);
+    // hack, 手动指定初始值 (解决deepExtend方法bug)
+    pJS.particles.color.value = pJS.particles.color.value || '#fff';
   }
 
   pJS.tmp.obj = {
@@ -267,26 +269,45 @@ var pJS = function(tag_id, params){
 
     /* color */
     this.color = {};
+
+    /**
+     * 支持对象格式的色值解析，例如 {r:255, g:255, b:255, a: 0.5}
+     * @param  {Object} color   [description]
+     * @param  {Object} context 上下文环境
+     */
+    var parseColorObj = function (color, context) {
+      var isRgbColor = color.r != undefined && color.g != undefined && color.b != undefined;
+      var isHslColor = color.h != undefined && color.s != undefined && color.l != undefined;
+      if(isRgbColor){
+        context.rgb = {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+          a: color.a
+        };
+      }
+      if(isHslColor){
+        context.hsl = {
+          h: color.h,
+          s: color.s,
+          l: color.l
+        };
+      }
+    };
+
     if(typeof(color.value) == 'object'){
 
       if(color.value instanceof Array){
         var color_selected = color.value[Math.floor(Math.random() * pJS.particles.color.value.length)];
-        this.color.rgb = hexToRgb(color_selected);
+        if(typeof(color_selected) == 'object') {
+          
+          // 如果color.value中含有对象，调用对象色值解析函数
+          parseColorObj(color_selected, this.color);
+        } else {
+          this.color.rgb = hexToRgb(color_selected);
+        }
       }else{
-        if(color.value.r != undefined && color.value.g != undefined && color.value.b != undefined){
-          this.color.rgb = {
-            r: color.value.r,
-            g: color.value.g,
-            b: color.value.b
-          }
-        }
-        if(color.value.h != undefined && color.value.s != undefined && color.value.l != undefined){
-          this.color.hsl = {
-            h: color.value.h,
-            s: color.value.s,
-            l: color.value.l
-          }
-        }
+        parseColorObj(color.value, this.color);
       }
 
     }
@@ -414,7 +435,8 @@ var pJS = function(tag_id, params){
     }
 
     if(p.color.rgb){
-      var color_value = 'rgba('+p.color.rgb.r+','+p.color.rgb.g+','+p.color.rgb.b+','+opacity+')';
+      // 支持自定义透明度
+      var color_value = 'rgba('+p.color.rgb.r+','+p.color.rgb.g+','+p.color.rgb.b+','+(p.color.rgb.a?p.color.rgb.a:opacity)+')';
     }else{
       var color_value = 'hsla('+p.color.hsl.h+','+p.color.hsl.s+'%,'+p.color.hsl.l+'%,'+opacity+')';
     }
@@ -1416,7 +1438,7 @@ var pJS = function(tag_id, params){
 Object.deepExtend = function(destination, source) {
   for (var property in source) {
     if (source[property] && source[property].constructor &&
-     source[property].constructor === Object) {
+     source[property].constructor === Object) {  // 此处判断存在bug，无法解析属性值为对象的情况
       destination[property] = destination[property] || {};
       arguments.callee(destination[property], source[property]);
     } else {
